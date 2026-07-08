@@ -1,0 +1,11 @@
+emulator:
+  window_title_contains: "RetroArch"
+  capture_method: windows
+
+game_loop:
+  fps: 4
+  cooldown_after_action: 0.3
+
+actions:
+  button_hold_duration: 100
+  dpad_hold_duration: 150

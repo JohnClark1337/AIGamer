@@ -1,0 +1,11 @@
+emulator:
+  window_title_contains: "Dolphin"
+  capture_method: windows
+
+game_loop:
+  fps: 3
+  cooldown_after_action: 0.4
+
+actions:
+  button_hold_duration: 80
+  dpad_hold_duration: 100
