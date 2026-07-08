@@ -1,6 +1,6 @@
 ollama:
   host: http://localhost:11434
-  model: llava:7b
+  model: llama3.2:latest
   temperature: 0.1
   num_predict: 64
 
@@ -8,7 +8,7 @@ game_loop:
   fps: 4
   max_steps: 0
   cooldown_after_action: 0.3
-  screenshot_scale: 0.5
+  screenshot_scale: 1.0
 
 emulator:
   window_title_contains: "Fusion"

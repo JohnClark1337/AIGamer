@@ -82,13 +82,12 @@ class GameLoop:
             return True
 
         processed = self._processor.process(raw_img)
-        send_img = processed.get("processed_image", raw_img)
+        state_text = processed.get("state_text", "No state data")
 
-        ctx = self._build_context(processed)
-        full_prompt = f"{ctx}\n\nWhat action should I take?"
+        full_prompt = f"{state_text}\n\n{self._system_prompt}\n\nWhat action should I take?"
 
-        log.debug("LLM prompt (context): %s", ctx[:300])
-        response = self._llm.generate(prompt=full_prompt, image=send_img)
+        log.debug("LLM state context: %s", state_text[:500])
+        response = self._llm.generate(prompt=full_prompt)
         log.info("LLM response: %s", response)
 
         action = self._parser.parse(response)
@@ -99,16 +98,6 @@ class GameLoop:
         self._last_action_time = time.monotonic()
         self._step += 1
         return True
-
-    def _build_context(self, processed: dict[str, Any]) -> str:
-        parts = [f"Game screen: {processed['width']}x{processed['height']} pixels"]
-        parts.append(self._system_prompt)
-
-        ocr = processed.get("ocr_text", "")
-        if ocr:
-            parts.append(f"On-screen text detected:\n{ocr[:500]}")
-
-        return "\n\n".join(parts)
 
     def _execute_action(self, action: Any) -> None:
         from agent.action_parser import ParsedAction
