@@ -39,6 +39,19 @@ class GameLoop:
         self._step = 0
         self._last_action_time = 0.0
         self._held_buttons: set[str] = set()
+        self._running_right = False
+
+    def _ensure_moving_right(self) -> None:
+        if not self._running_right:
+            self._input.hold_continuous("DPAD_RIGHT")
+            self._held_buttons.add("DPAD_RIGHT")
+            self._running_right = True
+
+    def _stop_moving_right(self) -> None:
+        if self._running_right:
+            self._input.release_button("DPAD_RIGHT")
+            self._held_buttons.discard("DPAD_RIGHT")
+            self._running_right = False
 
     def setup(self) -> bool:
         log.info("Looking for emulator window...")
@@ -64,16 +77,14 @@ class GameLoop:
         loop_cfg = self._cfg.get("game_loop", {})
         max_steps = loop_cfg.get("max_steps", 0)
         if max_steps > 0 and self._step >= max_steps:
+            self._stop_moving_right()
             log.info("Reached max steps (%d)", max_steps)
             return False
 
         screenshot_scale = loop_cfg.get("screenshot_scale", 0.5)
 
-        now = time.monotonic()
-        cooldown = loop_cfg.get("cooldown_after_action", 0.3)
-        if now - self._last_action_time < cooldown:
-            time.sleep(0.05)
-            return True
+        # Keep the character moving right by default while the LLM thinks
+        self._ensure_moving_right()
 
         raw_img = self._capture.capture(scale=screenshot_scale)
         if raw_img is None:
@@ -84,7 +95,7 @@ class GameLoop:
         processed = self._processor.process(raw_img)
         state_text = processed.get("state_text", "No state data")
 
-        full_prompt = f"{state_text}\n\n{self._system_prompt}\n\nWhat action should I take?"
+        full_prompt = f"{state_text}\n\n{self._system_prompt}\n\nWhat action?"
 
         log.debug("LLM state context: %s", state_text[:500])
         response = self._llm.generate(prompt=full_prompt)
@@ -95,7 +106,9 @@ class GameLoop:
 
         self._execute_action(action)
 
-        self._last_action_time = time.monotonic()
+        # After executing a decision (jump, etc.), resume moving right
+        self._ensure_moving_right()
+
         self._step += 1
         return True
 
@@ -130,5 +143,6 @@ class GameLoop:
         except KeyboardInterrupt:
             log.info("Stopped by user")
         finally:
+            self._stop_moving_right()
             self._input.shutdown()
             log.info("Agent stopped after %d steps", self._step)

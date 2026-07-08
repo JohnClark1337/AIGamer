@@ -4,14 +4,12 @@ from PIL import Image
 from typing import Any
 
 
-# Generic game colors in HSV
 _COLOR_RANGES: dict[str, tuple[tuple[int, int, int], tuple[int, int, int]]] = {
     "blue_cyan": ((90, 30, 30), (130, 255, 255)),
     "red": ((0, 100, 80), (10, 255, 255)),
     "red_alt": ((160, 100, 80), (180, 255, 255)),
     "gold_yellow": ((20, 80, 80), (45, 255, 255)),
     "green": ((40, 30, 30), (85, 200, 200)),
-    "white_bright": ((0, 0, 200), (180, 30, 255)),
 }
 
 
@@ -29,62 +27,68 @@ class StateProcessor:
         gray = cv2.cvtColor(arr, cv2.COLOR_RGB2GRAY)
         h, w = gray.shape
 
-        # Crop to gameplay area (skip top ~12% for score, bottom ~8% for HUD)
+        # Crop to gameplay area (skip top ~12% for score, bottom 5% for HUD border)
         game_top = int(h * 0.12)
-        game_bot = int(h * 0.92)
-        game_h = game_bot - game_top
-        game_gray = gray[game_top:game_bot, :]
-        game_hsv = cv2.cvtColor(arr[game_top:game_bot, :, :], cv2.COLOR_RGB2HSV)
+        game_bot = int(h * 0.95)
+        game = gray[game_top:game_bot, :]
+        gh, gw = game.shape
+        cw = gw // 3
 
         # -- Left / Center / Right brightness --
-        cw = w // 3
-        left_region = game_gray[:, :cw]
-        center_region = game_gray[:, cw : 2 * cw]
-        right_region = game_gray[:, 2 * cw :]
+        left = game[:, :cw]
+        center = game[:, cw : 2 * cw]
+        right = game[:, 2 * cw :]
+        left_bright = float(np.mean(left))
+        center_bright = float(np.mean(center))
+        right_bright = float(np.mean(right))
 
-        left_bright = float(np.mean(left_region))
-        center_bright = float(np.mean(center_region))
-        right_bright = float(np.mean(right_region))
-
-        # -- Edge density per strip --
-        edges = cv2.Canny(game_gray, 40, 120)
+        # -- Edge density --
+        edges = cv2.Canny(game, 40, 120)
         edge_density = float(np.mean(edges)) / 255.0
         left_edges = float(np.mean(edges[:, :cw])) / 255.0
         center_edges = float(np.mean(edges[:, cw : 2 * cw])) / 255.0
         right_edges = float(np.mean(edges[:, 2 * cw :])) / 255.0
 
-        # -- Ground detection (lower 40% of game area) --
-        lower_half = game_gray[game_h * 3 // 5 :, :]
-        lower_edges = float(np.mean(cv2.Canny(lower_half, 40, 120))) / 255.0
-        lower_mean = float(np.mean(lower_half))
-        lower_std = float(np.std(lower_half))
+        # -- Ground detection: vertical brightness profile --
+        # Find the row with the steepest brightness drop (sky → ground transition)
+        row_means = np.array([np.mean(game[y, :]) for y in range(gh)])
+        drops = np.diff(row_means)
+        max_drop_idx = int(np.argmin(drops))  # most negative = biggest brightness drop
+        max_drop = drops[max_drop_idx]
 
-        # Look for a horizontal ground line: strong horizontal edges in lower portion
-        sobel_x = np.abs(cv2.Sobel(lower_half, cv2.CV_64F, 1, 0, ksize=3))
-        horiz_edge_strength = float(np.mean(sobel_x)) / 255.0
+        # Ground line confidence: a sharp drop in the lower half of the screen
+        ground_in_lower_half = max_drop_idx > gh // 2
+        ground_confidence = 0.0
+        if ground_in_lower_half and max_drop < -15:
+            ground_confidence = min(1.0, -max_drop / 50.0)
 
-        # Check if the bottom portion has significant brightness change (ground/sky boundary)
-        bottom_row = game_gray[game_h - 5 :, :]
-        row_above = game_gray[game_h - 15 : game_h - 10, :]
-        bottom_mean = float(np.mean(bottom_row))
-        above_mean = float(np.mean(row_above))
+        # Also check: does the bottom 30% of the game area have significantly darker pixels?
+        bottom_section = game[int(gh * 0.7) :, :]
+        bottom_mean = float(np.mean(bottom_section))
+        top_mean = float(np.mean(game[: int(gh * 0.3), :]))
+        sky_ground_gap = top_mean - bottom_mean  # positive = ground darker than sky
 
-        has_ground = lower_edges > 0.08 or horiz_edge_strength > 0.03 or abs(bottom_mean - above_mean) > 20
+        has_ground = ground_confidence > 0.3 or sky_ground_gap > 15
 
-        # -- Color analysis --
+        # -- Player position --
         hsv_full = cv2.cvtColor(arr, cv2.COLOR_RGB2HSV)
 
-        def color_pct(lower, upper, hsv_img=hsv_full) -> float:
-            mask = cv2.inRange(hsv_img, np.array(lower), np.array(upper))
-            return float(np.mean(mask)) / 255.0
+        def _pct(low, high, src=hsv_full):
+            m = cv2.inRange(src, np.array(low), np.array(high))
+            return float(np.mean(m)) / 255.0
 
-        blue_pct = color_pct(_COLOR_RANGES["blue_cyan"][0], _COLOR_RANGES["blue_cyan"][1])
+        blue_pct = _pct(_COLOR_RANGES["blue_cyan"][0], _COLOR_RANGES["blue_cyan"][1])
         red_pct = max(
-            color_pct(_COLOR_RANGES["red"][0], _COLOR_RANGES["red"][1]),
-            color_pct(_COLOR_RANGES["red_alt"][0], _COLOR_RANGES["red_alt"][1]),
+            _pct(_COLOR_RANGES["red"][0], _COLOR_RANGES["red"][1]),
+            _pct(_COLOR_RANGES["red_alt"][0], _COLOR_RANGES["red_alt"][1]),
         )
-        gold_pct = color_pct(_COLOR_RANGES["gold_yellow"][0], _COLOR_RANGES["gold_yellow"][1])
-        green_pct = color_pct(_COLOR_RANGES["green"][0], _COLOR_RANGES["green"][1])
+        gold_pct = _pct(_COLOR_RANGES["gold_yellow"][0], _COLOR_RANGES["gold_yellow"][1])
+        green_pct = _pct(_COLOR_RANGES["green"][0], _COLOR_RANGES["green"][1])
+
+        # Blue pixel vertical position relative to game area
+        blue_mask = cv2.inRange(hsv_full, np.array((90, 30, 30)), np.array((130, 255, 255)))
+        blue_ys = np.where(blue_mask[game_top:game_bot, :] > 0)[0]
+        blue_vert_pos = float(np.mean(blue_ys)) / gh if len(blue_ys) > 0 else 0.5
 
         # -- Motion --
         motion = 0.0
@@ -95,34 +99,36 @@ class StateProcessor:
 
         # -- Build description --
         lines: list[str] = []
-        lines.append(f"Screen: {w}x{h}")
-        lines.append(f"Frame: {self._frame_count} Motion: {motion:.2f}")
-        lines.append(f"Edges: L={left_edges:.2f} C={center_edges:.2f} R={right_edges:.2f}")
-        lines.append(f"Brightness: L={left_bright:.0f} C={center_bright:.0f} R={right_bright:.0f}")
-        lines.append(f"Colors: blue={blue_pct:.2f} red={red_pct:.2f} gold={gold_pct:.2f} green={green_pct:.2f}")
 
         if has_ground:
-            lines.append("Ground below")
+            if blue_vert_pos < 0.4:
+                lines.append("Ground below, player is in the air (jumping)")
+            else:
+                lines.append("Ground below, player on ground")
         else:
-            lines.append("No ground below")
+            lines.append("No ground visible")
+
+        if motion > 0.05:
+            lines.append(f"Screen scrolling (motion {motion:.2f})")
+        elif motion > 0.02:
+            lines.append(f"Slight motion ({motion:.2f})")
 
         if center_bright < left_bright - 8 and center_bright < right_bright - 8:
-            lines.append("Dark area in center")
+            lines.append("Something dark ahead")
         if left_edges > 0.12 and center_edges < 0.08:
-            lines.append("Detail on left")
+            lines.append("Detail/obstacle on left")
         if right_edges > 0.12 and center_edges < 0.08:
-            lines.append("Detail on right")
-        if left_edges < 0.03 and center_edges < 0.03 and right_edges < 0.03:
-            lines.append("Low detail (open area or menu)")
+            lines.append("Detail/obstacle on right")
 
         if blue_pct > 0.04:
-            lines.append("Player (blue) detected")
+            lines.append("Sonic (blue) visible")
         if red_pct > 0.03:
-            lines.append("Enemy (red) detected")
+            lines.append("Enemy (red) visible")
         if gold_pct > 0.03:
-            lines.append("Rings (gold) detected")
-        if motion > 0.04:
-            lines.append(f"Motion: {motion:.2f}")
+            lines.append("Rings (gold) visible")
+
+        if motion < 0.01 and not has_ground:
+            lines.append("May be on menu/title screen")
 
         result["state_text"] = "\n".join(lines)
         result["processed_image"] = img

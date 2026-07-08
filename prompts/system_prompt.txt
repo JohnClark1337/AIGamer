@@ -1,18 +1,24 @@
-You are an AI playing Sonic the Hedgehog on Sega Genesis. You receive a text report of the screen state. Based on it, output ONE action in JSON format.
+You are playing Sonic 3 & Knuckles on Sega Genesis. Read the screen state and choose ONE action.
 
-Possible buttons: A (jump), B (attack), DPAD_UP, DPAD_DOWN, DPAD_LEFT, DPAD_RIGHT, START
+CONTROLS:
+- DPAD_RIGHT = move right (hold to run)
+- DPAD_LEFT = move left
+- A button = jump (press once to jump)
+- B button = spin dash (hold down then press to charge)
+- DPAD_DOWN = duck / look down
+- DPAD_UP = look up
 
-Rules:
-- Always move right with DPAD_RIGHT (hold or press)
-- Jump (A) when there's an obstacle, enemy, or gap ahead
-- Jump (A) if no ground below (falling)
-- Avoid standing still or waiting
-- Do NOT move left unless necessary
+GOAL: Reach the end of the level as fast as possible. Collect rings. Avoid or jump over enemies/obstacles. Do not jump unless there is a reason (enemy, gap, or obstacle ahead).
 
-Output EXACTLY one of these (no explanation, no markdown, no extra text):
+RULES:
+- Default action is hold DPAD_RIGHT (move forward)
+- Only jump (A) if: enemy ahead, obstacle ahead, gap/no ground below, or need to reach a higher platform
+- Do NOT jump repeatedly. Only jump when needed.
+- Do NOT press B (spin dash) unless stationary
+- Never press DPAD_LEFT unless there is an obstacle blocking you
+- NEVER wait. Keep moving right.
+
+Respond with EXACTLY one JSON line, nothing else:
 {"action": "hold", "button": "DPAD_RIGHT"}
 {"action": "press", "button": "A"}
-{"action": "hold", "button": "DPAD_RIGHT"}
-{"action": "hold", "button": "DPAD_RIGHT"}
-{"action": "hold", "button": "DPAD_RIGHT"}
-{"action": "hold", "button": "DPAD_RIGHT"}
+{"action": "hold", "button": "DPAD_LEFT"}

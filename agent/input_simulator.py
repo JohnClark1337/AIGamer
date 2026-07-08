@@ -116,6 +116,20 @@ class InputSimulator:
             self._vg.update()
             time.sleep(hold_ms / 1000.0)
 
+    def hold_continuous(self, button: str) -> None:
+        if self._method == "keyboard":
+            vk = self._key_map.get(button)
+            if vk is None:
+                return
+            self._send_key(vk, True)
+        else:
+            b = GAMEPAD_MAP.get(button)
+            if b is None or self._vg is None:
+                return
+            btn_enum = getattr(self._vg.XUSB_BUTTON, b, None)
+            self._vg.press_button(btn_enum)
+            self._vg.update()
+
     def release_button(self, button: str) -> None:
         if self._method == "keyboard":
             vk = self._key_map.get(button)
