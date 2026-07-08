@@ -25,18 +25,26 @@ def setup_logging(level: str) -> None:
 
 
 def cmd_run(args: argparse.Namespace) -> int:
-    config = load_config(args.config)
+    config = load_config(getattr(args, "config", None))
 
-    if args.model:
-        config["ollama"]["model"] = args.model
-    if args.emulator:
-        config["emulator"]["window_title_contains"] = args.emulator
-    if args.fps:
-        config["game_loop"]["fps"] = args.fps
-    if args.max_steps:
-        config["game_loop"]["max_steps"] = args.max_steps
-    if args.title:
-        config["emulator"]["window_title_contains"] = args.title
+    model = getattr(args, "model", None)
+    if model:
+        config["ollama"]["model"] = model
+
+    title = getattr(args, "title", None)
+    emu = getattr(args, "emulator", None)
+    if title:
+        config["emulator"]["window_title_contains"] = title
+    elif emu:
+        config["emulator"]["window_title_contains"] = emu
+
+    fps = getattr(args, "fps", None)
+    if fps:
+        config["game_loop"]["fps"] = fps
+
+    max_steps = getattr(args, "max_steps", None)
+    if max_steps:
+        config["game_loop"]["max_steps"] = max_steps
 
     setup_logging(config.get("logging", {}).get("level", "INFO"))
     log = logging.getLogger("main")
@@ -96,15 +104,15 @@ def main() -> int:
         description="Let Ollama play video games via emulators.",
     )
     parser.add_argument("--config", "-c", help="Path to config YAML file")
-    parser.add_argument("--model", "-m", help="Ollama model to use")
-    parser.add_argument("--emulator", "-e", help="Emulator name (e.g. RetroArch, Dolphin)")
-    parser.add_argument("--fps", type=float, help="Game loop iterations per second")
-    parser.add_argument("--max-steps", type=int, help="Max steps before stopping (0=infinite)")
-    parser.add_argument("--title", "-t", help="Window title filter for emulator capture")
 
     sub = parser.add_subparsers(dest="command", help="Commands")
 
-    sub.add_parser("run", help="Run the game-playing agent (default)")
+    run_p = sub.add_parser("run", help="Run the game-playing agent (default)")
+    run_p.add_argument("--model", "-m", help="Ollama model to use")
+    run_p.add_argument("--emulator", "-e", help="Emulator name (e.g. RetroArch, Dolphin)")
+    run_p.add_argument("--fps", type=float, help="Game loop iterations per second")
+    run_p.add_argument("--max-steps", type=int, help="Max steps before stopping (0=infinite)")
+    run_p.add_argument("--title", "-t", help="Window title filter for emulator capture")
 
     list_wins = sub.add_parser("list-windows", help="List visible windows with titles")
     list_wins.add_argument("--filter", "-f", default="", help="Filter window titles")

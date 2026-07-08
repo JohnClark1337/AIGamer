@@ -42,7 +42,7 @@ class OllamaClient:
         log.debug("Sending to Ollama: model=%s prompt_len=%d image=%s",
                    self._model, len(prompt), image is not None)
 
-        resp = requests.post(self._generate_url, json=payload, timeout=120)
+        resp = requests.post(self._generate_url, json=payload, timeout=600)
         resp.raise_for_status()
         data = resp.json()
         return data.get("response", "").strip()

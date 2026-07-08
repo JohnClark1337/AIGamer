@@ -1,8 +1,8 @@
 ollama:
   host: http://localhost:11434
-  model: llama3.2-vision:11b
-  temperature: 0.2
-  num_predict: 128
+  model: llava:7b
+  temperature: 0.1
+  num_predict: 64
 
 game_loop:
   fps: 4
