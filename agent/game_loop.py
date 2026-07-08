@@ -56,8 +56,7 @@ class GameLoop:
 
         log.info("Ollama available. Using model: %s", self._llm.model)
 
-        if not self._input.available:
-            log.warning("Gamepad input not available (ViGEmBus not installed?)")
+        log.info("Input method ready")
 
         return True
 
