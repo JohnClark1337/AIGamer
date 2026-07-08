@@ -11,8 +11,22 @@ game_loop:
   screenshot_scale: 0.5
 
 emulator:
-  window_title_contains: "RetroArch"
+  window_title_contains: "Fusion"
   capture_method: windows
+
+input:
+  method: keyboard
+  keys:
+    A: Z
+    B: X
+    X: A
+    Y: S
+    DPAD_UP: UP
+    DPAD_DOWN: DOWN
+    DPAD_LEFT: LEFT
+    DPAD_RIGHT: RIGHT
+    START: RETURN
+    BACK: BACKSPACE
 
 state_processing:
   enable_ocr: false
@@ -20,21 +34,8 @@ state_processing:
   contrast_enhance: false
 
 actions:
-  allowed_buttons:
-    - A
-    - B
-    - X
-    - Y
-    - DPAD_UP
-    - DPAD_DOWN
-    - DPAD_LEFT
-    - DPAD_RIGHT
-    - START
-    - BACK
-    - LEFT_SHOULDER
-    - RIGHT_SHOULDER
-  button_hold_duration: 100
-  dpad_hold_duration: 150
+  button_hold_duration: 80
+  dpad_hold_duration: 120
 
 logging:
   level: INFO
