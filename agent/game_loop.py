@@ -34,7 +34,7 @@ class GameLoop:
         self._processor = StateProcessor(config)
         self._llm = OllamaClient(config)
         self._parser = ActionParser()
-        self._input = InputSimulator(config)
+        self._input: InputSimulator | None = None
 
         self._step = 0
         self._last_action_time = 0.0
@@ -42,13 +42,13 @@ class GameLoop:
         self._running_right = False
 
     def _ensure_moving_right(self) -> None:
-        if not self._running_right:
+        if not self._running_right and self._input is not None:
             self._input.hold_continuous("DPAD_RIGHT")
             self._held_buttons.add("DPAD_RIGHT")
             self._running_right = True
 
     def _stop_moving_right(self) -> None:
-        if self._running_right:
+        if self._running_right and self._input is not None:
             self._input.release_button("DPAD_RIGHT")
             self._held_buttons.discard("DPAD_RIGHT")
             self._running_right = False
@@ -62,6 +62,8 @@ class GameLoop:
             return False
 
         log.info("Found emulator window (hwnd=%d)", self._capture.hwnd)
+
+        self._input = InputSimulator(self._cfg, target_hwnd=self._capture.hwnd)
 
         if not self._llm.is_available():
             log.error("Ollama is not running at %s", self._llm.model)
@@ -144,5 +146,6 @@ class GameLoop:
             log.info("Stopped by user")
         finally:
             self._stop_moving_right()
-            self._input.shutdown()
+            if self._input is not None:
+                self._input.shutdown()
             log.info("Agent stopped after %d steps", self._step)

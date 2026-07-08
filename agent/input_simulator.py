@@ -36,10 +36,11 @@ GAMEPAD_MAP = {
 
 
 class InputSimulator:
-    def __init__(self, config: dict[str, Any]):
+    def __init__(self, config: dict[str, Any], target_hwnd: int | None = None):
         self._cfg = config.get("actions", {})
         self._method = config.get("input", {}).get("method", "keyboard")
         self._key_map = dict(KEY_MAP)
+        self._target_hwnd = target_hwnd
 
         user_keys = config.get("input", {}).get("keys", {})
         for k, v in user_keys.items():
@@ -63,9 +64,25 @@ class InputSimulator:
 
         log.info("Input method: %s", self._method)
 
+    def _focus_target(self) -> None:
+        if self._target_hwnd is None:
+            return
+        try:
+            import win32gui
+            import win32process
+            cur_thread = win32api.GetCurrentThreadId()
+            target_thread = win32process.GetWindowThreadProcessId(self._target_hwnd)[0]
+            win32process.AttachThreadInput(cur_thread, target_thread, True)
+            win32gui.SetForegroundWindow(self._target_hwnd)
+            win32gui.BringWindowToTop(self._target_hwnd)
+            win32process.AttachThreadInput(cur_thread, target_thread, False)
+        except Exception:
+            pass
+
     def _send_key(self, vk_code: int, press: bool) -> None:
         import win32api
         import win32con
+        self._focus_target()
         flags = 0
         if not press:
             flags = win32con.KEYEVENTF_KEYUP
